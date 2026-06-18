@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ป๊อกเด้ง คาสิโน VIP - ไพ่พิเศษ 3 เด้ง (Firebase Edition)</title>
+    <style>
+        :root {
+            --casino-green: #0b4527;
+            --gold: #ffd700;
+            --card-red: #d32f2f;
+            --card-black: #212121;
+            --purple-back: #4a148c;
+        }
+
+        body {
+            background-color: var(--casino-green);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        h1 {
+            color: var(--gold);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+            margin-bottom: 5px;
+        }
+
+        .table-container {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 20px;
+            padding: 25px;
+            width: 100%;
+            max-width: 1000px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            border: 3px solid #08331d;
+        }
+
+        .dealer-section {
+            margin-bottom: 25px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            position: relative;
+        }
+
+        .players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 15px;
+            margin-top: 25px;
+        }
+
+        .player-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .player-box.active-turn {
+            border-color: var(--gold);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+            background: rgba(255, 215, 0, 0.05);
+        }
+
+        .player-box.is-spectator {
+            opacity: 0.4;
+            background: rgba(40, 40, 40, 0.5) !important;
+            border-color: #555 !important;
+            box-shadow: none !important;
+        }
+
+        .spectator-badge {
+            background: #e53935;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .balance-text {
+            font-size: 16px;
+            color: #ffeb3b;
+            font-weight: bold;
+            background: rgba(0,0,0,0.4);
+            padding: 3px 10px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+
+        .bet-container {
+            margin: 8px 0;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .bet-input {
+            background: #111;
+            color: var(--gold);
+            border: 1px solid var(--gold);
+            border-radius: 6px;
+            padding: 5px;
+            width: 90px;
+            text-align: center;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .bet-input:disabled {
+            background: rgba(255,255,255,0.05);
+            color: #aaa;
+            border-color: #555;
+        }
+
+        .control-panel {
+            background: #111;
+            padding: 15px;
+            border-radius: 12px;
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .deck-pile {
+            position: relative;
+            width: 55px;
+            height: 80px;
+        }
+
+        .deck-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--purple-back) 25%, #6a1b9a 25%, #6a1b9a 50%, var(--purple-back) 50%, var(--purple-back) 75%, #6a1b9a 75%, #6a1b9a 100%);
+            background-size: 8px 8px;
+            border: 1.5px solid white;
+            border-radius: 5px;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .deck-card-back:nth-child(1) { transform: translate(0, 0); }
+        .deck-card-back:nth-child(2) { transform: translate(3px, -3px); }
+        .deck-card-back:nth-child(3) { transform: translate(6px, -6px); }
+
+        @keyframes shuffleMotion {
+            0% { transform: translate(6px, -6px); }
+            25% { transform: translate(-35px, -10px) rotate(-15deg); z-index: 5; }
+            50% { transform: translate(6px, -6px); }
+            75% { transform: translate(40px, 5px) rotate(15deg); }
+            100% { transform: translate(6px, -6px); }
+        }
+
+        .deck-pile.shuffling .deck-card-back:nth-child(3) {
+            animation: shuffleMotion 0.35s ease-in-out infinite;
+        }
+
+        @keyframes dealCardAnim {
+            0% { transform: translateY(-120px) scale(0.3) rotate(-30deg); opacity: 0; filter: blur(2px); }
+            100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; filter: blur(0); }
+        }
+
+        .cards-display {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            min-height: 110px;
+            margin: 10px 0;
+        }
+
+        .card {
+            background: white;
+            border-radius: 6px;
+            width: 75px;
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 5px;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.4);
+            font-size: 18px;
+            font-weight: bold;
+            animation: dealCardAnim 0.45s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+        }
+
+        .card.back {
+            background: linear-gradient(135deg, var(--purple-back) 25%, #6a1b9a 25%, #6a1b9a 50%, var(--purple-back) 50%, var(--purple-back) 75%, #6a1b9a 75%, #6a1b9a 100%);
+            background-size: 10px 10px;
+            border: 2px solid white;
+        }
+
+        .card.red { color: var(--card-red); }
+        .card.black { color: var(--card-black); }
+        .card-middle { text-align: center; font-size: 30px; margin: auto 0; }
+
+        @keyframes coinBurst {
+            0% { transform: translate(-50%, -50%) translate(0, 0) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) translate(var(--x), var(--y)) scale(0.6) rotate(360deg); opacity: 0; }
+        }
+        .floating-coin {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            pointer-events: none;
+            font-size: 28px;
+            animation: coinBurst 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            z-index: 10;
+        }
+
+        @keyframes textFloat {
+            0% { transform: translate(-50%, 0) translateY(0); opacity: 1; scale: 1; }
+            100% { transform: translate(-50%, 0) translateY(-70px); opacity: 0; scale: 1.3; }
+        }
+        .floating-amount {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 32px;
+            font-weight: bold;
+            color: #69f0ae;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 20px #00e676;
+            pointer-events: none;
+            animation: textFloat 1.4s ease-out forwards;
+            z-index: 11;
+        }
+
+        .status-banner {
+            font-size: 18px;
+            color: var(--gold);
+            font-weight: bold;
+            min-width: 250px;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-main { background-color: #ff9800; color: white; }
+        .btn-main:hover { background-color: #e65100; }
+        .btn-action { background-color: #00bcd4; color: white; }
+        .btn-action:hover { background-color: #0097a7; }
+        .btn-stop { background-color: #9e9e9e; color: white; }
+        .btn-stop:hover { background-color: #757575; }
+
+        button:disabled { background-color: #444 !important; color: #888 !important; cursor: not-allowed; }
+
+        .result-text { font-size: 18px; font-weight: bold; margin-top: 10px; }
+        .win { color: #69f0ae; }
+        .lose { color: #ff5252; }
+        .draw { color: #e0e0e0; }
+        
+        .special-badge {
+            background: linear-gradient(45deg, #d4af37, #f3e5ab);
+            color: #111;
+            font-size: 13px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 5px;
+            box-shadow: 0 0 6px rgba(255,215,0,0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🏆 ป๊อกเด้ง คาสิโน VIP (ทุนเจ้ามือ 10,000 ฿)</h1>
+    <div style="color: #b2dfdb; margin-bottom: 20px;">ระบบเชื่อมต่อ Firebase Realtime Database เรียบร้อยแล้ว!</div>
+
+    <div class="table-container">
+        <div id="dealer-box" class="dealer-section">
+            <h2>🤵 เจ้ามือ (Dealer)</h2>
+            <div><span id="dealer-balance" class="balance-text">10000 ฿</span></div>
+            <div id="dealer-cards" class="cards-display"></div>
+            <div>สถานะไพ่: <span id="dealer-score">??</span> <span id="dealer-pok"></span></div>
+        </div>
+
+        <div class="control-panel">
+            <div class="deck-pile" id="main-deck-pile">
+                <div class="deck-card-back"></div>
+                <div class="deck-card-back"></div>
+                <div class="deck-card-back"></div>
+            </div>
+            <button id="start-btn" class="btn-main">เริ่มรอบถัดไป</button>
+            <div id="game-status-text" class="status-banner">วางเดิมพันแล้วกดเริ่มเล่น</div>
+            <button id="draw-btn" class="btn-action" disabled>จั่วไพ่</button>
+            <button id="stay-btn" class="btn-stop" disabled>พอแล้ว</button>
+        </div>
+
+        <div class="players-grid">
+            <div id="p1-box" class="player-box">
+                <h3>😎 ผู้เล่น 1 <span id="p1-status"></span></h3>
+                <div><span id="p1-balance" class="balance-text">1000 ฿</span></div>
+                <div class="bet-container">
+                    <label>ลงเดิมพัน:</label>
+                    <input type="number" id="p1-bet" class="bet-input" value="100" min="10">
+                </div>
+                <div id="p1-cards" class="cards-display"></div>
+                <div>สถานะไพ่: <span id="p1-score">??</span> <span id="p1-pok"></span></div>
+                <div id="p1-result" class="result-text"></div>
+            </div>
+
+            <div id="p2-box" class="player-box">
+                <h3>🦊 ผู้เล่น 2 <span id="p2-status"></span></h3>
+                <div><span id="p2-balance" class="balance-text">1000 ฿</span></div>
+                <div class="bet-container">
+                    <label>ลงเดิมพัน:</label>
+                    <input type="number" id="p2-bet" class="bet-input" value="100" min="10">
+                </div>
+                <div id="p2-cards" class="cards-display"></div>
+                <div>สถานะไพ่: <span id="p2-score">??</span> <span id="p2-pok"></span></div>
+                <div id="p2-result" class="result-text"></div>
+            </div>
+
+            <div id="p3-box" class="player-box">
+                <h3>🐼 ผู้เล่น 3 <span id="p3-status"></span></h3>
+                <div><span id="p3-balance" class="balance-text">1000 ฿</span></div>
+                <div class="bet-container">
+                    <label>ลงเดิมพัน:</label>
+                    <input type="number" id="p3-bet" class="bet-input" value="100" min="10">
+                </div>
+                <div id="p3-cards" class="cards-display"></div>
+                <div>สถานะไพ่: <span id="p3-score">??</span> <span id="p3-pok"></span></div>
+                <div id="p3-result" class="result-text"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+        // Firebase Configuration ที่คุณให้มา
+        const firebaseConfig = {
+            apiKey: "AIzaSyB04s8qJHFTgivPG7EHGgOHBmoIdYtWSzc",
+            authDomain: "mai545.firebaseapp.com",
+            databaseURL: "https://mai545-default-rtdb.firebaseio.com",
+            projectId: "mai545",
+            storageBucket: "mai545.firebasestorage.app",
+            messagingSenderId: "517880482027",
+            appId: "1:517880482027:web:deacf05790b0640e2096ae",
+            measurementId: "G-58LR1W5VP8"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        // --- เริ่มต้น Logic เกมเดิมของคุณ ---
+        const suits = ['♠', '♥', '♦', '♣'];
+        const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        const valueOrder = {'A':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9, '10':10, 'J':11, 'Q':12, 'K':13};
+        
+        let deck = [];
+        let tournamentOver = false;
+
+        let gameData = {
+            players: [
+                { id: 'p1', name: 'ผู้เล่น 1', hand: [], score: 0, isPok: false, specialType: '', multiplier: 1, balance: 1000, currentBet: 0, isSpectator: false },
+                { id: 'p2', name: 'ผู้เล่น 2', hand: [], score: 0, isPok: false, specialType: '', multiplier: 1, balance: 1000, currentBet: 0, isSpectator: false },
+                { id: 'p3', name: 'ผู้เล่น 3', hand: [], score: 0, isPok: false, specialType: '', multiplier: 1, balance: 1000, currentBet: 0, isSpectator: false }
+            ],
+            dealer: { hand: [], score: 0, isPok: false, specialType: '', multiplier: 1, balance: 10000 },
+            turnIndex: 0 
+        };
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        // 💾 ฟังก์ชันบันทึกข้อมูลเกมลง Firebase อัตโนมัติเมื่อมีการเปลี่ยนแปลง
+        function syncGameToFirebase() {
+            set(ref(database, 'pokdeng/gameState'), {
+                players: gameData.players,
+                dealer: gameData.dealer,
+                turnIndex: gameData.turnIndex,
+                timestamp: Date.now()
+            }).catch(err => console.error("Firebase Sync Error:", err));
+        }
+
+        // 🔄 ดึงข้อมูลเงินทุนล่าสุดจาก Firebase ตอนเริ่มเปิดหน้าเว็บครั้งแรก (ถ้ามีข้อมูลเก่า)
+        onValue(ref(database, 'pokdeng/gameState'), (snapshot) => {
+            const data = snapshot.val();
+            if (data && !deck.length && gameData.turnIndex === 0) { // Sync เฉพาะตอนที่ไม่ได้รันเกมอยู่ค้างไว้
+                if(data.dealer) {
+                    gameData.dealer.balance = data.dealer.balance;
+                    document.getElementById('dealer-balance').textContent = `${data.dealer.balance} ฿`;
+                }
+                if(data.players) {
+                    data.players.forEach((p, index) => {
+                        gameData.players[index].balance = p.balance;
+                        document.getElementById(`${p.id}-balance`).textContent = `${p.balance} ฿`;
+                    });
+                }
+            }
+        }, { onlyOnce: true });
+
+        function buildDeck() {
+            deck = [];
+            for (let s of suits) {
+                for (let v of values) {
+                    deck.push({ value: v, suit: s });
+                }
+            }
+        }
+
+        function shuffleDeck() {
+            for (let i = deck.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+        }
+
+        function getCardScore(cardValue) {
+            if (['10', 'J', 'Q', 'K'].includes(cardValue)) return 0;
+            if (cardValue === 'A') return 1;
+            return parseInt(cardValue);
+        }
+
+        function analyzeHand(hand) {
+            let result = { score: 0, isPok: false, specialType: '', multiplier: 1, rankPower: 0 };
+            if (hand.length === 2) {
+                let sum = hand.reduce((acc, card) => acc + getCardScore(card.value), 0) % 10;
+                result.score = sum;
+                if (sum === 8 || sum === 9) {
+                    result.isPok = true;
+                    result.specialType = `ป๊อก ${sum}`;
+                    if (hand[0].suit === hand[1].suit || hand[0].value === hand[1].value) {
+                        result.multiplier = 2;
+                    }
+                }
+                result.rankPower = sum;
+                return result;
+            }
+
+            if (hand.length === 3) {
+                let vals = hand.map(c => c.value);
+                let suitsInHand = hand.map(c => c.suit);
+                let orders = hand.map(c => valueOrder[c.value]).sort((a,b) => a - b);
+
+                let isFlush = suitsInHand.every(s => s === suitsInHand[0]);
+                let isTriple = vals.every(v => v === vals[0]);
+                let isStraight = (orders[1] === orders[0] + 1 && orders[2] === orders[1] + 1);
+                let isXian = vals.every(v => ['J', 'Q', 'K'].includes(v));
+
+                if (isTriple) {
+                    result.specialType = "ไพ่ตอง 👑";
+                    result.multiplier = 3;
+                    result.rankPower = 50;
+                } else if (isStraight && isFlush) {
+                    result.specialType = "สเตรทฟลัช 💥";
+                    result.multiplier = 3;
+                    result.rankPower = 40;
+                } else if (isXian) {
+                    result.specialType = "เซียนไพ่ ✨";
+                    result.multiplier = 3;
+                    result.rankPower = 30;
+                } else if (isStraight) {
+                    result.specialType = "เรียงไพ่ 📈";
+                    result.multiplier = 3;
+                    result.rankPower = 20;
+                } else {
+                    let sum = hand.reduce((acc, card) => acc + getCardScore(card.value), 0) % 10;
+                    result.score = sum;
+                    result.rankPower = sum;
+                    if (isFlush) {
+                        result.multiplier = 3;
+                        result.specialType = "3 เด้ง";
+                    }
+                }
+                return result;
+            }
+            return result;
+        }
+
+        function renderCard(card, containerId, isFaceDown = false) {
+            const container = document.getElementById(containerId);
+            const cardDiv = document.createElement('div');
+            if (isFaceDown) {
+                cardDiv.className = 'card back'; 
+            } else {
+                const colorClass = (card.suit === '♥' || card.suit === '♦') ? 'red' : 'black';
+                cardDiv.className = `card ${colorClass}`;
+                cardDiv.innerHTML = `
+                    <div>${card.value}${card.suit}</div>
+                    <div class="card-middle">${card.suit}</div>
+                    <div style="text-align: right; transform: rotate(180deg);">${card.value}${card.suit}</div>
+                `;
+            }
+            container.appendChild(cardDiv);
+        }
+
+        function triggerMoneyBurst(idName, amountText) {
+            const box = document.getElementById(`${idName}-box`);
+            const textEl = document.createElement('div');
+            textEl.className = 'floating-amount';
+            textEl.innerText = amountText;
+            box.appendChild(textEl);
+            setTimeout(() => textEl.remove(), 1400);
+
+            const items = ['🪙', '💰', '✨'];
+            for (let i = 0; i < 12; i++) {
+                const coin = document.createElement('div');
+                coin.className = 'floating-coin';
+                coin.innerText = items[Math.floor(Math.random() * items.length)];
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 60 + Math.random() * 100; 
+                const x = Math.cos(angle) * distance + 'px';
+                const y = Math.sin(angle) * distance + 'px';
+                coin.style.setProperty('--x', x);
+                coin.style.setProperty('--y', y);
+                box.appendChild(coin);
+                setTimeout(() => coin.remove(), 1200);
+            }
+        }
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            if (tournamentOver) {
+                resetWholeTournament();
+            } else {
+                startNewGame();
+            }
+        });
+
+        function resetWholeTournament() {
+            gameData.players.forEach(p => {
+                p.balance = 1000;
+                p.isSpectator = false;
+                document.getElementById(`${p.id}-status`).innerHTML = '';
+                document.getElementById(`${p.id}-bet`).value = 100;
+                document.getElementById(`${p.id}-bet`).disabled = false;
+                document.getElementById(`${p.id}-balance`).textContent = '1000 ฿';
+            });
+            gameData.dealer.balance = 10000;
+            document.getElementById('dealer-balance').textContent = '10000 ฿';
+            document.getElementById('start-btn').textContent = 'เริ่มรอบถัดไป';
+            tournamentOver = false;
+            
+            syncGameToFirebase(); // ซิงค์ล้างกระดานใหม่บน Firebase
+            startNewGame();
+        }
+
+        async function startNewGame() {
+            let activePlayersCount = gameData.players.filter(p => !p.isSpectator).length;
+            if (activePlayersCount === 0 || gameData.dealer.balance <= 0) return;
+
+            let isBetValid = true;
+            gameData.players.forEach(p => {
+                if (p.isSpectator) return;
+                const betInput = document.getElementById(`${p.id}-bet`);
+                let betValue = parseInt(betInput.value) || 0;
+                if (betValue <= 0 || betValue > p.balance) isBetValid = false;
+            });
+
+            if (!isBetValid) {
+                alert("❌ กรุณาตรวจสอบจำนวนชิปเดิมพันให้ถูกต้อง!");
+                return;
+            }
+
+            document.querySelectorAll('.cards-display').forEach(el => el.innerHTML = '');
+            document.querySelectorAll('.result-text').forEach(el => el.textContent = '');
+            document.querySelectorAll('[id$="-pok"]').forEach(el => el.textContent = '');
+            document.getElementById('dealer-score').textContent = '??';
+            document.querySelectorAll('[id$="-score"]').forEach(el => el.textContent = '??');
+            document.getElementById('start-btn').disabled = true;
+
+            document.getElementById('game-status-text').textContent = "⏳ เจ้ามือรวบสำรับ กำลังสับไพ่...";
+            const pile = document.getElementById('main-deck-pile');
+            pile.classList.add('shuffling'); 
+            
+            buildDeck();
+            shuffleDeck();
+            
+            await sleep(1400); 
+            pile.classList.remove('shuffling');
+
+            gameData.players.forEach(p => {
+                if (p.isSpectator) return;
+                const betInput = document.getElementById(`${p.id}-bet`);
+                p.currentBet = parseInt(betInput.value);
+                p.balance -= p.currentBet;
+                document.getElementById(`${p.id}-balance`).textContent = `${p.balance} ฿`;
+                betInput.disabled = true;
+
+                p.hand = [deck.pop(), deck.pop()];
+                let analysis = analyzeHand(p.hand);
+                p.score = analysis.score;
+                p.isPok = analysis.isPok;
+                p.specialType = analysis.specialType;
+                p.multiplier = analysis.multiplier;
+                p.rankPower = analysis.rankPower;
+            });
+
+            gameData.dealer.hand = [deck.pop(), deck.pop()];
+            let dAnalysis = analyzeHand(gameData.dealer.hand);
+            gameData.dealer.score = dAnalysis.score;
+            gameData.dealer.isPok = dAnalysis.isPok;
+            gameData.dealer.specialType = dAnalysis.specialType;
+            gameData.dealer.multiplier = dAnalysis.multiplier;
+            gameData.dealer.rankPower = dAnalysis.rankPower;
+
+            document.getElementById('game-status-text').textContent = "🃏 เจ้ามือแจกไพ่เวียนรอบโต๊ะ...";
+            
+            for (let p of gameData.players) {
+                if (!p.isSpectator) { renderCard(null, `${p.id}-cards`, true); await sleep(200); }
+            }
+            renderCard(null, 'dealer-cards', true); await sleep(200);
+
+            for (let p of gameData.players) {
+                if (!p.isSpectator) { renderCard(null, `${p.id}-cards`, true); await sleep(200); }
+            }
+            renderCard(null, 'dealer-cards', true); await sleep(200);
+
+            gameData.turnIndex = 0;
+            syncGameToFirebase(); // อัปเดตสถานะหลังแจกไพ่เสร็จลง Firebase
+            nextTurn();
+        }
+
+        function nextTurn() {
+            gameData.players.forEach(p => {
+                const box = document.getElementById(`${p.id}-box`);
+                if (!p.isSpectator) box.className = 'player-box';
+            });
+
+            if (gameData.turnIndex >= gameData.players.length) {
+                dealerTurn();
+                return;
+            }
+
+            let currentPlayer = gameData.players[gameData.turnIndex];
+            if (currentPlayer.isSpectator) {
+                gameData.turnIndex++;
+                nextTurn();
+                return;
+            }
+
+            document.getElementById(`${currentPlayer.id}-box`).classList.add('active-turn');
+            document.getElementById('game-status-text').textContent = `ตาของ: ${currentPlayer.name} (หงายไพ่)`;
+
+            const pCardsContainer = document.getElementById(`${currentPlayer.id}-cards`);
+            pCardsContainer.innerHTML = ''; 
+            currentPlayer.hand.forEach(card => renderCard(card, `${currentPlayer.id}-cards`, false)); 
+            
+            if (currentPlayer.isPok) {
+                document.getElementById(`${currentPlayer.id}-score`).textContent = currentPlayer.score;
+                document.getElementById(`${currentPlayer.id}-pok`).innerHTML = `<span class="special-badge">${currentPlayer.specialType} (${currentPlayer.multiplier}เด้ง)</span>`;
+                setTimeout(() => { gameData.turnIndex++; syncGameToFirebase(); nextTurn(); }, 1500);
+                return;
+            } else {
+                document.getElementById(`${currentPlayer.id}-score`).textContent = currentPlayer.score;
+                document.getElementById('draw-btn').disabled = false;
+                document.getElementById('stay-btn').disabled = false;
+            }
+        }
+
+        document.getElementById('draw-btn').addEventListener('click', () => {
+            let currentPlayer = gameData.players[gameData.turnIndex];
+            let newCard = deck.pop();
+            currentPlayer.hand.push(newCard);
+            
+            let analysis = analyzeHand(currentPlayer.hand);
+            currentPlayer.score = analysis.score;
+            currentPlayer.specialType = analysis.specialType;
+            currentPlayer.multiplier = analysis.multiplier;
+            currentPlayer.rankPower = analysis.rankPower;
+            
+            renderCard(newCard, `${currentPlayer.id}-cards`, false); 
+            document.getElementById(`${currentPlayer.id}-score`).textContent = currentPlayer.specialType ? "พิเศษ" : currentPlayer.score;
+            if(currentPlayer.specialType) {
+                document.getElementById(`${currentPlayer.id}-pok`).innerHTML = `<span class="special-badge">${currentPlayer.specialType}</span>`;
+            }
+
+            document.getElementById('draw-btn').disabled = true;
+            document.getElementById('stay-btn').disabled = true;
+            gameData.turnIndex++;
+            
+            syncGameToFirebase(); // ซิงค์ข้อมูลการจั่วไพ่ลงฐานข้อมูล
+            setTimeout(nextTurn, 1000);
+        });
+
+        document.getElementById('stay-btn').addEventListener('click', () => {
+            document.getElementById('draw-btn').disabled = true;
+            document.getElementById('stay-btn').disabled = true;
+            gameData.turnIndex++;
+            syncGameToFirebase(); // ซิงค์การผ่านเทิร์น
+            nextTurn();
+        });
+
+        function dealerTurn() {
+            document.getElementById('game-status-text').textContent = `เจ้ามือเปิดไพ่หงาย...`;
+            
+            const dealerCardsContainer = document.getElementById('dealer-cards');
+            dealerCardsContainer.innerHTML = '';
+            gameData.dealer.hand.forEach(card => renderCard(card, 'dealer-cards', false));
+            document.getElementById('dealer-score').textContent = gameData.dealer.score;
+            
+            if(gameData.dealer.isPok) {
+                document.getElementById('dealer-pok').innerHTML = `<span class="special-badge">${gameData.dealer.specialType} (${gameData.dealer.multiplier}เด้ง)</span>`;
+            }
+
+            if (gameData.dealer.score < 5 && !gameData.dealer.isPok) {
+                setTimeout(() => {
+                    document.getElementById('game-status-text').textContent = `เจ้ามือจั่วใบที่ 3`;
+                    let newCard = deck.pop();
+                    gameData.dealer.hand.push(newCard);
+                    
+                    let dAnalysis = analyzeHand(gameData.dealer.hand);
+                    gameData.dealer.score = dAnalysis.score;
+                    gameData.dealer.specialType = dAnalysis.specialType;
+                    gameData.dealer.multiplier = dAnalysis.multiplier;
+                    gameData.dealer.rankPower = dAnalysis.rankPower;
+                    
+                    renderCard(newCard, 'dealer-cards', false);
+                    document.getElementById('dealer-score').textContent = gameData.dealer.specialType ? "พิเศษ" : gameData.dealer.score;
+                    if(gameData.dealer.specialType) {
+                        document.getElementById('dealer-pok').innerHTML = `<span class="special-badge">${gameData.dealer.specialType}</span>`;
+                    }
+                    syncGameToFirebase();
+                    setTimeout(endGame, 1000);
+                }, 1200);
+            } else {
+                syncGameToFirebase();
+                setTimeout(endGame, 1200);
+            }
+        }
+
+        function endGame() {
+            document.getElementById('game-status-text').textContent = `สรุปยอดบัญชีผลแพ้ชนะ`;
+            
+            let dPower = gameData.dealer.rankPower;
+            let dealerNetChange = 0;
+
+            gameData.players.forEach(p => {
+                if (p.isSpectator) return;
+
+                const resultDiv = document.getElementById(`${p.id}-result`);
+                let isPlayerWin = false;
+                let isDraw = false;
+                let finalMultiplier = 1;
+
+                if (p.rankPower > dPower) {
+                    isPlayerWin = true;
+                    finalMultiplier = p.multiplier;
+                    resultDiv.textContent = `🎉 ชนะ! (${p.specialType || p.score+' แต้ม'})`;
+                    resultDiv.className = "result-text win";
+                } else if (p.rankPower < dPower) {
+                    finalMultiplier = gameData.dealer.multiplier;
+                    resultDiv.textContent = `❌ แพ้เจ้ามือ (${gameData.dealer.specialType || gameData.dealer.score+' แต้ม'})`;
+                    resultDiv.className = "result-text lose";
+                } else {
+                    isDraw = true;
+                    resultDiv.textContent = "🤝 เสมอเจ๊ากัน";
+                    resultDiv.className = "result-text draw";
+                }
+
+                if (isPlayerWin) {
+                    let winAmount = p.currentBet * finalMultiplier;
+                    p.balance += (p.currentBet + winAmount);
+                    dealerNetChange -= winAmount;
+                    setTimeout(() => { triggerMoneyBurst(p.id, `+${winAmount} ฿`); }, 300);
+                } else if (isDraw) {
+                    p.balance += p.currentBet;
+                } else {
+                    let loseAmount = p.currentBet * finalMultiplier;
+                    dealerNetChange += loseAmount;
+                    p.balance -= (loseAmount - p.currentBet); 
+                }
+
+                document.getElementById(`${p.id}-balance`).textContent = `${p.balance} ฿`;
+            });
+
+            // อัปเดตยอดคงเหลือท้ายเกมของเจ้ามือ
+            gameData.dealer.balance += dealerNetChange;
+            document.getElementById('dealer-balance').textContent = `${gameData.dealer.balance} ฿`;
+
+            // ตรวจสอบสถานะการจบ Tournament
+            gameData.players.forEach(p => {
+                if (p.balance <= 0) {
+                    p.isSpectator = true;
+                    document.getElementById(`${p.id}-status`).innerHTML = `<span class="spectator-badge">หมดตัว (Spectator)</span>`;
+                    document.getElementById(`${p.id}-box`).classList.add('is-spectator');
+                }
+            });
+
+            let activePlayersCount = gameData.players.filter(p => !p.isSpectator).length;
+            if (activePlayersCount === 0) {
+                document.getElementById('game-status-text').textContent = "📉 ผู้เล่นทุกคนหมดตัว! เจ้ามือกวาดเรียบเรียบร้อย 👑";
+                document.getElementById('start-btn').textContent = "💵 รีเซ็ตตาราง/เริ่มทัวร์นาเมนต์ใหม่";
+                tournamentOver = true;
+            } else if (gameData.dealer.balance <= 0) {
+                document.getElementById('game-status-text').textContent = "💥 เจ้ามือหมดตัวล้มละลาย! ผู้เล่นชนะ 🏆";
+                document.getElementById('start-btn').textContent = "💵 รีเซ็ตตาราง/เริ่มทัวร์นาเมนต์ใหม่";
+                tournamentOver = true;
+            }
+
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById(`${gameData.players[0].id}-bet`).disabled = gameData.players[0].isSpectator;
+            document.getElementById(`${gameData.players[1].id}-bet`).disabled = gameData.players[1].isSpectator;
+            document.getElementById(`${gameData.players[2].id}-bet`).disabled = gameData.players[2].isSpectator;
+
+            syncGameToFirebase(); // บันทึกเงินทุนและผลรอบนี้ส่งท้ายไปยัง Firebase
+        }
+    </script>
+</body>
+</html>
